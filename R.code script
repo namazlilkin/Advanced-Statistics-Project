@@ -1,0 +1,147 @@
+R-Script
+library(tidyverse)
+library(forecast)
+library(urca)
+library(TSstudio)
+library(quantmod)
+library(aTSA)
+library(AER)
+library(stats)
+library(moments)
+library(tswge)
+library(dplyr)
+library(strucchange)
+library(plotrix)
+library(readxl)
+library(xts)
+library(highfrequency)
+library(tseries)
+library(ggplot2)
+library(fBasics)
+library(rugarch)
+library(rumidas)
+library(FinTS)
+library(MCS)
+library(psych)
+library(car)
+library(caTools)
+library(MASS)
+library(corrplot)
+library(lattice)
+library(strucchange)
+library(lmtest)
+library(nortest)
+ 
+attach(datBI.txt)
+ 
+#Dependent Variable
+HI0100 <- na.omit(datBI.txt$HI0100) #amount spent on food at home
+ 
+#Independent Variables
+HB0900 <- na.omit(datBI.txt$HB0900) # current price of household main residence
+DN3001 <- na.omit(datBI.txt$DN3001) # net wealth
+PA0100 <- na.omit(datBI.txt$PA0100) # maritul status
+HB2300 <- na.omit(datBI.txt$HB2300) # monthly amount paid as rent
+ 
+#Arranging the data
+DN3001 <- DN3001[-(1603:7951)]
+HB0900 <- HB0900[-(1603:5954)]
+HI0100 <- HI0100[-(1603:33333)]
+PA0100 <- PA0100[-(1603:32423)]
+ 
+HB2300 <- as.numeric(HB2300)
+ 
+#Some summary statistics
+summary(DN3001)
+summary(HB0900)
+summary(HB2300)
+summary(HI0100)
+summary(PA0100)
+ 
+#Checking for normality
+qqnorm(DN3001, main='Normal')
+qqline(DN3001)
+ 
+qqnorm(HB0900, main='Normal')
+qqline(HB0900)
+ 
+qqnorm(HB2300, main='Normal')
+qqline(HB2300)
+ 
+qqnorm(HI0100, main='Normal')
+qqline(HI0100)
+ 
+ 
+#Creating the dummies
+install.packages('fastDummies')
+library('fastDummies')
+ 
+data <- data.frame(HI0100,DN3001, HB0900, HB2300, PA0100)
+data_dummy <- dummy_cols(data, select_columns = 'PA0100')
+head(data_dummy)
+ 
+data_dummy$PA0100 <- NULL
+ 
+plot(model)
+ 
+#Building the model
+model <- lm(HI0100 ~ DN3001 + HB0900 + HB2300 + PA0100_1 + PA0100_2+ PA0100_4, data = data_dummy)
+summary(model)
+ 
+avPlots(model, main = "Linearity in the Parameters")
+ 
+confint(new_model, level=0.99)
+ 
+vif_values <- vif(model)
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue") #create horizontal bar chart to display each VIF value
+ 
+cor(data_dummy[,-8], method = "pearson")
+ 
+#Visualizing the cor matrix
+install.packages("corrplot")
+library(corrplot)
+corrplot(cor(data_dummy[,-8], method = "pearson"))
+ 
+#Chow Test
+sctest(HI0100 ~ DN3001 + HB0900 + HB2300 + PA0100_1+ PA0100_2+ PA0100_4, data = data_dummy, type = "Chow", point = 10)
+ 
+#Goldfeld Quandt test to check heteroscedasticity
+gqtest(model, order.by = ~DN3001 + HB0900 + HB2300 + PA0100_1+ PA0100_2+ PA0100_4, data = data_dummy)
+ 
+#Breusch-Pagan Test for the same purpose
+bptest(model)
+ 
+residualPlots(model)
+hist(residuals(model),col="peachpuff", border="black", prob = TRUE,xlab = "temp")
+lines(density(residuals(model)),
+     lwd = 2, col = "chocolate3")
+ 
+ 
+qqnorm(resid(model), main = "Normal Q-Q Plot")
+qqline(resid(model), col = "blue")
+ 
+#Residuals
+jarque.bera.test(model$residuals)
+layout(matrix(c(1,2,3,4),2,2))
+plot(model)
+ols_plot_resid_hist(model)
+ 
+ 
+chisq.test(model$fitted.values)
+ 
+#finding optimal lambda for Box-Cox transformation
+bc <- boxcox(HI0100 ~ DN3001 + HB2300 + PA0100_1 + PA0100_2+ PA0100_4, data = data_dummy)
+lambda <- bc$x[which.max(bc$y)]
+ 
+#fitting new linear regression model using the Box-Cox transformation
+new_model <- lm(((HI0100^lambda-1)/lambda) ~ DN3001  + HB2300 + PA0100_1 + PA0100_2+ PA0100_4, data = data_dummy)
+summary(new_model)
+ 
+plot(new_model)
+ 
+hist(residuals(new_model),col="peachpuff", border="black", prob = TRUE,xlab = "temp")
+lines(density(residuals(new_model)),
+     lwd = 2, col = "chocolate3")
+ 
+#Goldfeld Quandt test to check heteroscedasticity
+gqtest(new_model, order.by = ~DN3001 + HB2300 + PA0100_1+ PA0100_2+ PA0100_4, data = data_dummy)
